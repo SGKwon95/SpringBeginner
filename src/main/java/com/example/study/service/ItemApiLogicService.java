@@ -1,0 +1,108 @@
+package com.example.study.service;
+
+import com.example.study.model.entity.Item;
+import com.example.study.model.network.Header;
+import com.example.study.model.network.request.ItemApiRequest;
+import com.example.study.model.network.response.ItemApiResponse;
+import com.example.study.repository.ItemRepository;
+import com.example.study.repository.PartnerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Service
+public class ItemApiLogicService extends BaseService<ItemApiRequest,ItemApiResponse,Item> {
+    @Autowired
+    private PartnerRepository partnerRepository;
+
+    /*BaseService를 상속받으면 사용할 필요 없어진다.
+    @Autowired
+    private ItemRepository itemRepository;
+     */
+
+    @Override
+    public Header<ItemApiResponse> create(Header<ItemApiRequest> request) {
+        //ItemApiRequest body = request.getData();
+
+        //Optional.ofNullable : null이 될 수도 아닐수도 있는 객체, null값이 발생할 경우 nullpointException 을 발생시키지 않는다
+        return Optional.ofNullable(request.getData())
+                .map(body->{
+                    Item item = Item.builder()
+                            .status(body.getStatus())
+                            .name(body.getName())
+                            .title(body.getTitle())
+                            .content(body.getContent())
+                            .price(body.getPrice())
+                            .brandName(body.getBrandName())
+                            .registeredAt(LocalDateTime.now())
+                            .partner(partnerRepository.getOne(body.getPartnerId()))
+                            .build();
+
+                    return item;
+                })
+                .map(newItem -> baseRepository.save(newItem))
+                .map(newItem -> response(newItem))
+                .orElseGet(()->Header.ERROR("No data"));
+
+    }
+
+    @Override
+    public Header<ItemApiResponse> read(Long id) {
+        return baseRepository.findById(id)
+                .map(item->response(item))
+                .orElseGet(()-> Header.ERROR("No data"));
+    }
+
+    @Override
+    public Header<ItemApiResponse> update(Header<ItemApiRequest> request) {
+        ItemApiRequest body = request.getData();
+
+        return baseRepository.findById(body.getId())
+                .map(entityItem -> {
+                    entityItem
+                            .setStatus(body.getStatus())
+                            .setName(body.getName())
+                            .setTitle(body.getTitle())
+                            .setContent(body.getContent())
+                            .setPrice(body.getPrice())
+                            .setBrandName(body.getBrandName())
+                            .setRegisteredAt(body.getRegisteredAt())
+                            .setUnregisteredAt(body.getUnregisteredAt());
+                    return entityItem;
+                })
+                .map(newEntityItem-> baseRepository.save(newEntityItem))
+                .map(item->response(item))
+                .orElseGet(()->Header.ERROR("No data"));
+    }
+
+    @Override
+    public Header delete(Long id) {
+        return baseRepository.findById(id)
+                .map(item->{
+                    baseRepository.delete(item);//delete는 반환형이 void이므로 바로 ok를 리턴해주면 된다.
+                    return Header.OK();
+                })
+                .orElseGet(()->Header.ERROR(("No data")));
+    }
+
+    public Header<ItemApiResponse> response(Item item) {
+
+        //String statusTitle = item.getStatus().getTitle();
+
+        ItemApiResponse body = ItemApiResponse.builder()
+                .id(item.getId())
+                .status(item.getStatus())
+                .name(item.getName())
+                .title(item.getTitle())
+                .content(item.getContent())
+                .price(item.getPrice())
+                .brandName(item.getBrandName())
+                .registeredAt(item.getRegisteredAt())
+                .unregisteredAt(item.getUnregisteredAt())
+                .partnerId(item.getPartner().getId())
+                .build();
+        return Header.OK(body);
+    }
+}
